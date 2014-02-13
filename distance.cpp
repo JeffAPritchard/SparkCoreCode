@@ -4,10 +4,12 @@
 volatile int StartMeasurement = D1;
 volatile int EchoPin = D2;
 
+volatile unsigned long startPulse = 0;
+volatile unsigned long endPulse = 0;
 
-int measurePulse(int pin);
 int attemptDistanceMeasurementOnce(void);
 int attemptDistanceUntilSuccess(void);
+void ultrasonicISR(void);
 
 void setup() {
     pinMode(StartMeasurement, OUTPUT);
@@ -24,11 +26,11 @@ void loop() {
 
     // use a USB terminal app to view the distance measurements 
     // (I downloaded "serailTools" for Mac for free on appStore)
-    Serial.print("Duration: ");
+    Serial.print("Duration in microseconds: ");
     Serial.println(duration); 
     
     // totally empirical conversion (Note: dependent on processor speed of Spark Core!  Yuck!)
-    distanceInches = (duration - 5.0) / 56.0;
+    distanceInches = duration / 148.0;
     
     Serial.print("Distance in inches: ");
     Serial.println(distanceInches); 
@@ -63,42 +65,31 @@ int attemptDistanceMeasurementOnce(void)
 {
     int duration;
     
+    endPulse = startPulse = 0;
+    attachInterrupt(EchoPin, ultrasonicISR, CHANGE);
+    
     // pulse the sensor to make it get a distance reading
     digitalWrite(StartMeasurement, HIGH);
     delay(5);
     digitalWrite(StartMeasurement, LOW);
     
-    // see how long the echo pulse emitted by distance sensor is
-    duration = measurePulse(EchoPin);
+    // wait while we ostensibly get both up and down edges of pulse (and interrupts)
+    // the interrupt service routine sets our start and end "times" in microseconds
+    delay(20);
+    duration = endPulse - startPulse;
+    
+    detachInterrupt(EchoPin);
 
     return duration;
 }
 
-
-// NOTE: This is ugly -- spark team has not provided micro second timing yet and need sub-millisecond timing...
-// at 1130 feet per second, 1 inch is only about 74 microseconds, so obviously millisecond resolution
-// won't work for typical distances for which the sensor is used
-// so we are using this skanky processor speed dependent counter loop to deterimine the length of the echo pulse
-// this should be improved once Spark team provides a sub-millisecond timer
-int measurePulse(int pin)
+void ultrasonicISR(void)
 {
-    int duration = 0;
-    
-        // wait for the initial rising of the echo pin
-        // give up if no pulse arrives
-    while(digitalRead(EchoPin) == LOW && duration < 100000)
-    {
-        duration += 1;
-    }
+    if(digitalRead(EchoPin) == HIGH)
+        startPulse = micros();
+    else
+        endPulse = micros();
     
     
-    // count cycles until the pin goes low
-    // give up if something goes wrong (duration keeps going forever)
-    duration = 0;
-    while(digitalRead(EchoPin) == HIGH && duration < 100000)
-    {
-        duration += 1;
-    }
-
-    return duration;
 }
+
