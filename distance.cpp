@@ -29,7 +29,7 @@ void loop() {
     Serial.print("Duration in microseconds: ");
     Serial.println(duration); 
     
-    // totally empirical conversion (Note: dependent on processor speed of Spark Core!  Yuck!)
+    // totally empirical conversion 
     distanceInches = duration / 148.0;
     
     Serial.print("Distance in inches: ");
@@ -40,6 +40,7 @@ void loop() {
     delay(250);
 }
 
+// mine doesn't work totally reliably, so I built in retrying
 int attemptDistanceUntilSuccess()
 {
     int duration;
